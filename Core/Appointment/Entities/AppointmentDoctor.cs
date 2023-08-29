@@ -3,8 +3,24 @@ using Domain.Doctor.Enum;
 
 namespace Core.Appointment.Entities;
 
-public sealed class AppointmentDoctor : BaseValueObject<AppointmentDoctor>
+public class AppointmentDoctor : BaseValueObject<AppointmentDoctor>
 {
+    private AppointmentDoctor()
+    {
+
+    }
+    private AppointmentDoctor(Guid doctorId, LevelType levelType, string fullName)
+    {
+        DoctorId = doctorId;
+        FullName = fullName;
+    }
+
+    public static AppointmentDoctor New(Guid doctorId, LevelType levelType, string fullName)
+    {
+        return new AppointmentDoctor(doctorId, levelType, fullName);
+    }
+
+
     #region Fields
 
     public Guid DoctorId { get; private set; }

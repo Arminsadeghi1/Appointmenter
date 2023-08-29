@@ -1,5 +1,6 @@
 ﻿using Core.Appointment.Entities;
 using Core.Doctor.Entities;
+using Data;
 using Data.Repositories.Contracts;
 using Domain.Appointment.Commands;
 using Domain.Appointment.Exceptions;
@@ -12,13 +13,16 @@ public sealed class SetAppointmentHandler
 {
     private readonly IDoctorRepository _doctorRepository;
     private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetAppointmentHandler(
         IDoctorRepository doctorRepository,
-        IAppointmentRepository appointmentRepository)
+        IAppointmentRepository appointmentRepository,
+        IUnitOfWork unitOfWork)
     {
         _doctorRepository = doctorRepository;
         _appointmentRepository = appointmentRepository;
+        this._unitOfWork = unitOfWork;
     }
 
     public async Task Handle(SetAppointmentCommand command, CancellationToken cancellationToken)
@@ -48,6 +52,15 @@ public sealed class SetAppointmentHandler
         CheckOverlapForDoctors(
             doctor.LevelType, command.AppointmentStartDateTime, command.DurationMinutes, dayAppointments);
 
+        var appointment = new Appointment(
+            command.AppointmentStartDateTime,
+            command.AppointmentStartDateTime.AddMinutes(command.DurationMinutes),
+            AppointmentDoctor.New(command.DoctorId, doctor.LevelType, doctor.FullName),
+            AppointmentPatient.New(command.PatientId, ""));
+
+        await _appointmentRepository.Add(appointment, cancellationToken);
+
+        await _unitOfWork.CommitAsync();
     }
 
 
@@ -118,13 +131,13 @@ public sealed class SetAppointmentHandler
         if (pervAppointment is null)
             return;
 
-        if (appointmentStartDateTime > pervAppointment.StartTime && 
-            appointmentStartDateTime < pervAppointment.EndTime
+        if (appointmentStartDateTime > pervAppointment.StartDateTime && 
+            appointmentStartDateTime < pervAppointment.EndDateTime
             )
             throw new AppointmentTimeHasOverlapWithPreviousException();
         
-        if (appointmentStartDateTime.AddMinutes(durationMinutes) > pervAppointment.StartTime && 
-            appointmentStartDateTime.AddMinutes(durationMinutes) < pervAppointment.EndTime
+        if (appointmentStartDateTime.AddMinutes(durationMinutes) > pervAppointment.StartDateTime && 
+            appointmentStartDateTime.AddMinutes(durationMinutes) < pervAppointment.EndDateTime
             )
             throw new DoctorIsNotAvailableOnThisTimeException();
 
@@ -147,8 +160,8 @@ public sealed class SetAppointmentHandler
 
         var isOutOfRange = dayAppointments.Count(
             c => 
-            appointmentStartDateTime < c.StartTime && 
-            appointmentStartDateTime.Add(new TimeSpan(0, durationMinutes, 0)) < c.EndTime);
+            appointmentStartDateTime < c.StartDateTime && 
+            appointmentStartDateTime.Add(new TimeSpan(0, durationMinutes, 0)) < c.EndDateTime);
 
         if (isOutOfRange >= alowableOverlapCount)
             throw new OverlapForDoctorsException();
