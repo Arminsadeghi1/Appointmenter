@@ -1,6 +1,7 @@
 ﻿using Application_Service.Handlers;
 using Domain.Appointment.Commands;
 using Domain.Appointment.Exceptions;
+using Domain.Doctor.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Appointmenter_Api.Controllers;
@@ -25,6 +26,11 @@ public class AppointmentController : ControllerBase
         {
             await handler.Handle(command, CancellationToken.None);
             return Ok("Appointment registered successfully");
+        }
+        catch (DoctorNotFoundException ex)
+        {
+            //ToDo: lod ex message
+            return Ok("پزشک مورد نظر یافت نشد");
         }
         catch (InvalidDurationMinutesForGeneralDoctorException ex)
         {
@@ -72,4 +78,32 @@ public class AppointmentController : ControllerBase
             return Ok("some thing is wrrong. call to support");
         }
     }
+    
+    [HttpPost("set-earliest-appointment")]
+    public async Task<IActionResult> SetEarliestAppointment(
+        [FromServices] SetEarliestAppointmentHandler handler, [FromBody] SetEarliestAppointmentCommand command)
+    {
+
+        try
+        {
+            await handler.Handle(command, CancellationToken.None);
+            return Ok("Appointment registered successfully");// return time
+        }
+        catch (DoctorNotFoundException ex)
+        {
+            //ToDo: lod ex message
+            return Ok("پزشک مورد نظر یافت نشد");
+        }
+        catch (NotFoundAnyAppiontmentChanseException ex)
+        {
+            //ToDo: lod ex message
+            return Ok("هیچ فرصتی برای قرار ملاقات در 30 روز آتی یافت نشد");
+        }
+        catch (Exception ex)
+        {
+            //ToDo: lod ex message
+            return Ok("some thing is wrrong. call to support");
+        }
+    }
+
 }

@@ -6,16 +6,20 @@ using Domain.Appointment.Commands;
 using Domain.Appointment.Exceptions;
 using Domain.Doctor.Enum;
 using Domain.Doctor.Exceptions;
+using System;
 
 namespace Application_Service.Handlers;
 
-public sealed class SetAppointmentHandler
+public sealed class SetEarliestAppointmentHandler
 {
     private readonly IDoctorRepository _doctorRepository;
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public SetAppointmentHandler(
+    private Guid patientId;
+    private Doctor doctor;
+
+    public SetEarliestAppointmentHandler(
         IDoctorRepository doctorRepository,
         IAppointmentRepository appointmentRepository,
         IUnitOfWork unitOfWork)
@@ -25,44 +29,100 @@ public sealed class SetAppointmentHandler
         this._unitOfWork = unitOfWork;
     }
 
-    public async Task Handle(SetAppointmentCommand command, CancellationToken cancellationToken)
+    public async Task<DateTime> Handle(SetEarliestAppointmentCommand command, CancellationToken cancellationToken)
     {
-        var doctor = await _doctorRepository.Load(command.DoctorId, cancellationToken);
+        patientId = command.PatientId;
+        doctor = await _doctorRepository.Load(command.DoctorId, cancellationToken);
         if (doctor == null)
             throw new DoctorNotFoundException();
-
-        var dayAppointments = await _appointmentRepository.LoadByDay(command.AppointmentStartDateTime, cancellationToken);
-
 
         CheckAppointmentDuration(
             doctor.LevelType, command.DurationMinutes);
 
-        CheckAppointmentTimeAccordingClinicSchedule(
-            command.AppointmentStartDateTime, command.DurationMinutes);
-
-        CheckAppointmentTimeAccordingDoctorSchedule(
-            command.AppointmentStartDateTime, command.DurationMinutes, doctor.WeekLySchedule);
-
-        CheckNumberOfPatientAppointmentsPerDay(
-            dayAppointments, command.PatientId);
-
-        CheckOverlapOfPatientAppointmentsInDay(
-            command.AppointmentStartDateTime, command.DurationMinutes, dayAppointments, command.PatientId);
-
-        CheckOverlapForDoctors(
-            doctor.LevelType, command.AppointmentStartDateTime, command.DurationMinutes, dayAppointments);
+        var searchPeriod = 30;
+        var appointmentStartDateTime = await FindFirstAvailableTime(command.DurationMinutes, searchPeriod, cancellationToken);
+        if (appointmentStartDateTime is null)
+            throw new NotFoundAnyAppiontmentChanseException();
 
         var appointment = new Appointment(
-            command.AppointmentStartDateTime,
-            command.AppointmentStartDateTime.AddMinutes(command.DurationMinutes),
+            appointmentStartDateTime.Value,
+            appointmentStartDateTime.Value.AddMinutes(command.DurationMinutes),
             AppointmentDoctor.New(command.DoctorId, doctor.LevelType, doctor.FullName),
             AppointmentPatient.New(command.PatientId, ""));
 
         await _appointmentRepository.Add(appointment, cancellationToken);
 
         await _unitOfWork.CommitAsync();
+
+        return appointmentStartDateTime.Value;
     }
 
+    private async Task<DateTime?> FindFirstAvailableTime(
+        byte durationMinutes, int period, CancellationToken cancellationToken)
+    {
+        var today = DateTime.Now.Date;
+
+        for (int i = 0; i < period; i++)
+        {
+            var dayAppointments = await _appointmentRepository.LoadByDay(today.AddDays(i), cancellationToken);
+
+            var appointmentStartDateTime = ProseccDuringADay(durationMinutes, today.AddDays(i), dayAppointments);
+            if (appointmentStartDateTime is not null)
+                return today.AddDays(i).Add(appointmentStartDateTime.Value);
+        }
+        return null;
+    }
+
+    private TimeSpan? ProseccDuringADay(
+        int durationMinutes, DateTime dete, List<Appointment> appointments)
+    {
+        TimeSpan clinikStartTime = new TimeSpan(9, 0, 0);
+        TimeSpan clinikEndTime = new TimeSpan(18, 0, 0);
+        var appointmentsCounts = appointments.Count();
+
+        if (clinikStartTime.Add(new TimeSpan(0, durationMinutes, 0)) < appointments[0].StartDateTime.TimeOfDay)
+            if (Varification(dete, clinikStartTime, durationMinutes))
+                return clinikStartTime;
+
+        for (int i = 0; i < appointmentsCounts - 1; i++)
+        {
+            if (appointments[i].EndDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < appointments[i + 1].StartDateTime.TimeOfDay)
+                if (Varification(dete, clinikStartTime, durationMinutes))
+                    return appointments[i].EndDateTime.TimeOfDay;
+        }
+
+        if (appointments[appointmentsCounts - 1].EndDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < clinikEndTime)
+            if (Varification(dete, clinikStartTime, durationMinutes))
+                return appointments[appointmentsCounts - 1].EndDateTime.TimeOfDay;
+
+        return null;
+    }
+
+    private bool Varification(
+        DateTime date, TimeSpan time, int durationMinutes, List<Appointment> appointments)
+    {
+        try
+        {
+            CheckAppointmentTimeAccordingDoctorSchedule(
+                date.Add(time), durationMinutes, doctor.WeekLySchedule);
+
+            CheckNumberOfPatientAppointmentsPerDay(
+                appointments, patientId);
+
+            CheckOverlapOfPatientAppointmentsInDay(
+                date.Add(time), durationMinutes, appointments, patientId);
+
+            CheckOverlapForDoctors(
+                doctor.LevelType, date.Add(time), durationMinutes, appointments);
+
+            return true;
+        }
+        catch (Exception)
+        {
+           return false;
+        }
+
+    }
 
     private void CheckAppointmentDuration(
         LevelType doctorLevelType, int durationMinutes)
@@ -80,25 +140,6 @@ public sealed class SetAppointmentHandler
         if (doctorLevelType == LevelType.Expert)
             if (durationMinutes < MinTimeForExpert || durationMinutes > MaxTimeForExpert)
                 throw new InvalidDurationMinutesForGeneralDoctorException();
-    }
-
-    private void CheckAppointmentTimeAccordingClinicSchedule(
-        DateTime appointmentStartDateTime, int durationMinutes)
-    {
-        //ToDo: Clinic Schedule time limits dynamic from DB
-        DayOfWeek[] clinicWorkingDays = { DayOfWeek.Sunday, DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday };
-
-        TimeSpan clinicStartTime = new TimeSpan(9, 0, 0);
-        TimeSpan clinicEndTime = new TimeSpan(18, 0, 0);
-
-        if (!clinicWorkingDays.Contains(appointmentStartDateTime.DayOfWeek))
-            throw new TheClinicIsClosedOnThisDayException();
-
-        if (appointmentStartDateTime.TimeOfDay < clinicStartTime)
-            throw new TheClinicIsClosedOnThisTimeException();
-
-        if (appointmentStartDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < clinicEndTime)
-            throw new TheClinicIsClosedOnThisTimeException();
     }
 
     private void CheckAppointmentTimeAccordingDoctorSchedule(
@@ -144,7 +185,7 @@ public sealed class SetAppointmentHandler
     }
 
     private void CheckOverlapForDoctors(
-        LevelType doctorLevelType, DateTime appointmentStartDateTime, byte durationMinutes, List<Appointment> dayAppointments)
+        LevelType doctorLevelType, DateTime appointmentStartDateTime, int durationMinutes, List<Appointment> dayAppointments)
     {
         var alowableOverlapCount = 0;
 
