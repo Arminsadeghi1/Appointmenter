@@ -29,52 +29,52 @@ public class AppointmentController : ControllerBase
         }
         catch (DoctorNotFoundException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("پزشک مورد نظر یافت نشد");
         }
         catch (InvalidDurationMinutesForGeneralDoctorException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("مدت زمان قرار ملاقات معتبر نمیباشد");
         }
         catch (TheClinicIsClosedOnThisDayException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("درمانگاه در این روز تعطیل میباشد");
         }
         catch (TheClinicIsClosedOnThisTimeException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("درمانگاه در این ساعت تعطیل میباشد");
         }
         catch (DoctorIsNotAvailableOnThisDayException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("دکتر مورد نظر در این روز حضور ندارد");
         }
         catch (DoctorIsNotAvailableOnThisTimeException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("دکتر مورد نظر در این ساعت حضور ندارد");
         }
         catch (InvalidNumberOfPatientAppointmentsPerDayException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("شما در حال حاضر دو نوبت فعال دارید و دیگر در این روز قادر به دریافت نوبت نمیباشید");
         }
         catch (AppointmentTimeHasOverlapWithPreviousException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("بازه زمانی انتخاب شده با دیگر نوبت شما در این روز تداخل دارد.");
         }
         catch (OverlapForDoctorsException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("به دلیل تکمیل ظرفیت پزشکان . درمانگاه ظرفیت ثبت نوبت جدید را ندارد. لطفا زمان دیگری را انتخاب بفرماییدو ");
         }
         catch (Exception ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("some thing is wrrong. call to support");
         }
     }
@@ -86,22 +86,21 @@ public class AppointmentController : ControllerBase
 
         try
         {
-            await handler.Handle(command, CancellationToken.None);
-            return Ok("Appointment registered successfully");// return time
+            return Ok(await handler.Handle(command, CancellationToken.None));
         }
         catch (DoctorNotFoundException ex)
         {
-            //ToDo: lod ex message
+           _logger.LogError(nameof(ex).ToString());
             return Ok("پزشک مورد نظر یافت نشد");
         }
         catch (NotFoundAnyAppiontmentChanseException ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("هیچ فرصتی برای قرار ملاقات در 30 روز آتی یافت نشد");
         }
         catch (Exception ex)
         {
-            //ToDo: lod ex message
+            _logger.LogError(nameof(ex).ToString());
             return Ok("some thing is wrrong. call to support");
         }
     }
