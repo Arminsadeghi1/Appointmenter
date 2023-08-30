@@ -81,18 +81,18 @@ public sealed class SetEarliestAppointmentHandler
         var appointmentsCounts = appointments.Count();
 
         if (clinikStartTime.Add(new TimeSpan(0, durationMinutes, 0)) < appointments[0].StartDateTime.TimeOfDay)
-            if (Varification(dete, clinikStartTime, durationMinutes))
+            if (Varification(dete, clinikStartTime, durationMinutes, appointments))
                 return clinikStartTime;
 
         for (int i = 0; i < appointmentsCounts - 1; i++)
         {
             if (appointments[i].EndDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < appointments[i + 1].StartDateTime.TimeOfDay)
-                if (Varification(dete, clinikStartTime, durationMinutes))
+                if (Varification(dete, clinikStartTime, durationMinutes, appointments))
                     return appointments[i].EndDateTime.TimeOfDay;
         }
 
         if (appointments[appointmentsCounts - 1].EndDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < clinikEndTime)
-            if (Varification(dete, clinikStartTime, durationMinutes))
+            if (Varification(dete, clinikStartTime, durationMinutes, appointments))
                 return appointments[appointmentsCounts - 1].EndDateTime.TimeOfDay;
 
         return null;
@@ -207,5 +207,6 @@ public sealed class SetEarliestAppointmentHandler
         if (isOutOfRange >= alowableOverlapCount)
             throw new OverlapForDoctorsException();
     }
+
 
 }
