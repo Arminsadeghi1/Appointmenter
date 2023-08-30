@@ -1,5 +1,5 @@
-﻿using Domain;
-using Domain.Appointment.Events;
+﻿using Domain.Appointment.Events;
+using Domain.Appointment.Exceptions;
 using Domain.Base;
 
 namespace Core.Appointment.Entities;
@@ -49,8 +49,8 @@ public sealed class Appointment : BaseAggregateRoot<Guid>
 
     protected override void ValidateInvariants()
     {
-        //ToDo:
-        //throw new NotImplementedException();
+        if (EndDateTime < StartDateTime)
+            throw new InvalidAppointmentStartAndEndTimeException();
     }
 
 }

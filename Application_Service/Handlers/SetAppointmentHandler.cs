@@ -112,7 +112,7 @@ public sealed class SetAppointmentHandler
             throw new DoctorIsNotAvailableOnThisTimeException();
 
         if (appointmentStartDateTime.TimeOfDay.Add(new TimeSpan(0, durationMinutes, 0)) < schedule.EndTime)
-            throw new DoctorIsNotAvailableOnThisDayException();
+            throw new DoctorIsNotAvailableOnThisTimeException();
 
     }
 
@@ -139,7 +139,7 @@ public sealed class SetAppointmentHandler
         if (appointmentStartDateTime.AddMinutes(durationMinutes) > pervAppointment.StartDateTime && 
             appointmentStartDateTime.AddMinutes(durationMinutes) < pervAppointment.EndDateTime
             )
-            throw new DoctorIsNotAvailableOnThisTimeException();
+            throw new AppointmentTimeHasOverlapWithPreviousException();
 
     }
 
